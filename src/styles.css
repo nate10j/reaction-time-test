@@ -1,6 +1,10 @@
 .waiting {
-	background: #1eca2c;
+	background: #fff;
+}
+
+.fail {
+	background: #f6312e;
 }
 .stop {
-	background: #f6312e;
+	background: #1eca2c;
 }

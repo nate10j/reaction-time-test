@@ -13,14 +13,15 @@ struct Model {
 enum ReactionTestState {
     Start,
     Waiting,
+    Fail,
     Stop,
     Stopped
 }
 
 #[derive(Debug)]
 enum Event {
-    StartTime,
-    StopTime
+    Click,
+    Stop,
 }
 
 #[relm4::component]
@@ -29,34 +30,50 @@ impl SimpleComponent for Model {
     type Input = Event;
     type Output =  ();
 
+
+    // fix indentation here; could be lsp issue
     view! {
         gtk::Window {
             set_title: Some("Better Reaction Time"),
             set_default_width: 800,
             set_default_height: 500,
 
-            gtk::Box {
+            gtk::Button {
                 #[watch]
                 set_class_active: ("waiting", model.reaction_test_state == ReactionTestState::Waiting),
                 #[watch]
-                set_class_active: ("stop", model.reaction_test_state == ReactionTestState::Stopped),
-                set_orientation: gtk::Orientation::Vertical,
+                set_class_active: ("stop", model.reaction_test_state == ReactionTestState::Stop),
 
-                gtk::Button {
-                    set_label: "Start",
-                    connect_clicked => Event::StartTime
-                },
-                gtk::Button {
-                set_label: "Stop",
-                connect_clicked => Event::StopTime
-                },
+
+                match model.reaction_test_state {
+                ReactionTestState::Start => {
+                    gtk::Label {
+                        set_label: "Start"
+                    }
+                }
+                ReactionTestState::Waiting => {
+                    gtk::Label {
+                        set_label: "Waiting"
+                    }
+                }
+                ReactionTestState::Stopped => {
+                    gtk::Label {
+                        set_label: "Click to reset"
+                    }
+                }
+                _ => {
                 gtk::Label {
-                    #[watch]
-                    set_label: &format!("{} ms", (model.time * 1000.0).floor()),
+                    set_label: ""
                 }
             }
-        }
+
+        },
+
+        connect_clicked => Event::Click,
     }
+}
+}
+
 
     fn init(_params: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let model = Model {
@@ -69,21 +86,48 @@ impl SimpleComponent for Model {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, event: Self::Input, _sender: ComponentSender<Self>) {
+    fn update(&mut self, event: Self::Input, sender: ComponentSender<Self>) {
         match event {
-            Event::StartTime => {
-                self.reaction_test_state = ReactionTestState::Waiting;
+            Event::Click => {
+                match self.reaction_test_state {
+                    ReactionTestState::Start => {
+                        // started
+                        self.reaction_test_state = ReactionTestState::Waiting;
+                        tokio::spawn(async move {
+                            wait_for_stop(sender).await;
+                        });
+                    }
+                    ReactionTestState::Waiting => {
+                        // clicked during waiting, too early
+                        self.reaction_test_state = ReactionTestState::Fail;
+                    }
+                    ReactionTestState::Fail => {
+                        self.reaction_test_state = ReactionTestState::Stopped;
+                    }
+                    ReactionTestState::Stop => {
+                        // perfect time to stop
+                        self.reaction_test_state = ReactionTestState::Stopped;
+                    }
+                    ReactionTestState::Stopped => {
+                        self.reaction_test_state = ReactionTestState::Start;
+                    }
+                }
                 self.timer = Some(Instant::now());
             }
-            Event::StopTime => {
-                self.reaction_test_state = ReactionTestState::Stopped;
-                self.time = self.timer.unwrap().elapsed().as_secs_f32();
+            Event::Stop => {
+                self.reaction_test_state = ReactionTestState::Stop;
             }
         }
     }
 }
 
-fn main() {
+async fn wait_for_stop(sender: ComponentSender<Model>) {
+    tokio::time::sleep(std::time::Duration::new(2, 0)).await;
+    sender.input(Event::Stop);
+}
+
+#[tokio::main]
+async fn main() {
     let app = RelmApp::new("com.github.nate10j.BetterReactionTime");
     let _ = relm4::set_global_css_from_file(std::path::Path::new("src/styles.css"));
     app.run::<Model>(());

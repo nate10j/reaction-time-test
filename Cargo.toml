@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 relm4 = "0.9.1"
 relm4-components = "0.9.1"
+tokio = { version = "1.43.0", features = ["full"] }
