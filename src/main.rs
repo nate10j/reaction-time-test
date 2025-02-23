@@ -126,8 +126,7 @@ async fn wait_for_stop(sender: ComponentSender<Model>) {
     sender.input(Event::Stop);
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let app = RelmApp::new("com.github.nate10j.BetterReactionTime");
     let _ = relm4::set_global_css_from_file(std::path::Path::new("src/styles.css"));
     app.run::<Model>(());
