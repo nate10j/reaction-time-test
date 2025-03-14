@@ -4,13 +4,13 @@ use relm4::{gtk, ComponentParts, ComponentSender, RelmApp, SimpleComponent, Relm
 
 struct Model {
     timer: Option<Instant>,
-    reaction_test_state: ReactionTestState,
+    reaction_display: ReactionTimeDisplay,
     time: f32,
 }
 
 // State is what it is showing e.g. Start has not started timer, but the button says start
 #[derive(PartialEq)]
-enum ReactionTestState {
+enum ReactionTimeDisplay {
     Start,
     Waiting,
     Fail,
@@ -40,25 +40,25 @@ impl SimpleComponent for Model {
 
             gtk::Button {
                 #[watch]
-                set_class_active: ("waiting", model.reaction_test_state == ReactionTestState::Waiting),
+                set_class_active: ("waiting", model.reaction_display == ReactionTimeDisplay::Waiting),
                 #[watch]
-                set_class_active: ("stop", model.reaction_test_state == ReactionTestState::Stop),
+                set_class_active: ("stop", model.reaction_display == ReactionTimeDisplay::Stop),
 
 
-                match model.reaction_test_state {
-                ReactionTestState::Start => {
+                match model.reaction_display {
+                ReactionTimeDisplay::Start => {
                     gtk::Label {
                         set_label: "Start"
                     }
                 }
-                ReactionTestState::Waiting => {
+                ReactionTimeDisplay::Waiting => {
                     gtk::Label {
                         set_label: "Waiting"
                     }
                 }
-                ReactionTestState::Stopped => {
+                ReactionTimeDisplay::Stopped => {
                     gtk::Label {
-                        set_label: "Click to reset"
+                        set_label: &format!("{} ms Click to reset", model.time)
                     }
                 }
                 _ => {
@@ -78,7 +78,7 @@ impl SimpleComponent for Model {
     fn init(_params: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let model = Model {
             timer: None,
-            reaction_test_state: ReactionTestState::Start,
+            reaction_display: ReactionTimeDisplay::Start,
             time: 0.0,
         };
         let widgets = view_output!();
@@ -89,33 +89,38 @@ impl SimpleComponent for Model {
     fn update(&mut self, event: Self::Input, sender: ComponentSender<Self>) {
         match event {
             Event::Click => {
-                match self.reaction_test_state {
-                    ReactionTestState::Start => {
+                match self.reaction_display {
+                    ReactionTimeDisplay::Start => {
                         // started
-                        self.reaction_test_state = ReactionTestState::Waiting;
+                        self.reaction_display = ReactionTimeDisplay::Waiting;
                         tokio::spawn(async move {
                             wait_for_stop(sender).await;
                         });
                     }
-                    ReactionTestState::Waiting => {
+                    ReactionTimeDisplay::Waiting => {
                         // clicked during waiting, too early
-                        self.reaction_test_state = ReactionTestState::Fail;
+                        self.reaction_display = ReactionTimeDisplay::Fail;
                     }
-                    ReactionTestState::Fail => {
-                        self.reaction_test_state = ReactionTestState::Stopped;
+                    ReactionTimeDisplay::Fail => {
+                        self.reaction_display = ReactionTimeDisplay::Stopped;
                     }
-                    ReactionTestState::Stop => {
-                        // perfect time to stop
-                        self.reaction_test_state = ReactionTestState::Stopped;
+                    ReactionTimeDisplay::Stop => {
+                        // after click stop
+                        
+                        self.time = self.timer.unwrap().elapsed().as_secs_f32();
+                        self.reaction_display = ReactionTimeDisplay::Stopped;
                     }
-                    ReactionTestState::Stopped => {
-                        self.reaction_test_state = ReactionTestState::Start;
+                    ReactionTimeDisplay::Stopped => {
+                        self.reaction_display = ReactionTimeDisplay::Start;
                     }
                 }
-                self.timer = Some(Instant::now());
             }
+
+            // this is invoked when time is passed and user has to stop
+            // timer is started
             Event::Stop => {
-                self.reaction_test_state = ReactionTestState::Stop;
+                self.timer = Some(Instant::now());
+                self.reaction_display = ReactionTimeDisplay::Stop;
             }
         }
     }
