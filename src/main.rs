@@ -1,11 +1,12 @@
 use std::time::Instant;
+use rand::prelude::*;
 use gtk::prelude::{BoxExt, ButtonExt, GtkWindowExt, OrientableExt, WidgetExt};
 use relm4::{gtk, ComponentParts, ComponentSender, RelmApp, SimpleComponent, RelmWidgetExt};
 
 struct Model {
     timer: Option<Instant>,
     reaction_display: ReactionTimeDisplay,
-    time: f32,
+    time: f32
 }
 
 // State is what it is showing e.g. Start has not started timer, but the button says start
@@ -43,6 +44,8 @@ impl SimpleComponent for Model {
                 set_class_active: ("waiting", model.reaction_display == ReactionTimeDisplay::Waiting),
                 #[watch]
                 set_class_active: ("stop", model.reaction_display == ReactionTimeDisplay::Stop),
+                #[watch]
+                set_class_active: ("fail", model.reaction_display == ReactionTimeDisplay::Fail),
 
 
                 match model.reaction_display {
@@ -58,7 +61,8 @@ impl SimpleComponent for Model {
                 }
                 ReactionTimeDisplay::Stopped => {
                     gtk::Label {
-                        set_label: &format!("{} ms Click to reset", model.time)
+                        #[watch]
+                        set_label: &format!("{} ms", (model.time * 1000.0).floor())
                     }
                 }
                 _ => {
@@ -119,6 +123,10 @@ impl SimpleComponent for Model {
             // this is invoked when time is passed and user has to stop
             // timer is started
             Event::Stop => {
+                // if failed, dont react at all.
+                if self.reaction_display != ReactionTimeDisplay::Waiting {
+                    return;
+                }
                 self.timer = Some(Instant::now());
                 self.reaction_display = ReactionTimeDisplay::Stop;
             }
@@ -127,7 +135,11 @@ impl SimpleComponent for Model {
 }
 
 async fn wait_for_stop(sender: ComponentSender<Model>) {
-    tokio::time::sleep(std::time::Duration::new(2, 0)).await;
+    let wait = {
+        let mut rng = rand::rng();
+        rng.random_range(500..3000)
+    };
+    tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
     sender.input(Event::Stop);
 }
 
