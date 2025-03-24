@@ -48,6 +48,7 @@ impl SimpleComponent for Model {
                 #[watch]
                 set_class_active: ("fail", model.reaction_display == ReactionTimeDisplay::Fail),
 
+                add_css_class: "reaction",
 
                 match model.reaction_display {
                 ReactionTimeDisplay::Start => {
@@ -64,7 +65,6 @@ impl SimpleComponent for Model {
                     gtk::Label {
                         #[watch]
                         set_label: &format!("{} ms", (model.time * 1000.0).floor()),
-                        set_width_chars: 48
                     }
                 }
                 _ => {

@@ -8,3 +8,7 @@
 .stop {
 	background: #1eca2c;
 }
+
+.reaction label {
+	font-size: 24px;
+}
