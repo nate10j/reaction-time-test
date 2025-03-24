@@ -6,7 +6,8 @@ use relm4::{gtk, ComponentParts, ComponentSender, RelmApp, SimpleComponent, Relm
 struct Model {
     timer: Option<Instant>,
     reaction_display: ReactionTimeDisplay,
-    time: f32
+    time: f32,
+    waiting_task: Option<tokio::task::JoinHandle<()>>
 }
 
 // State is what it is showing e.g. Start has not started timer, but the button says start
@@ -62,7 +63,8 @@ impl SimpleComponent for Model {
                 ReactionTimeDisplay::Stopped => {
                     gtk::Label {
                         #[watch]
-                        set_label: &format!("{} ms", (model.time * 1000.0).floor())
+                        set_label: &format!("{} ms", (model.time * 1000.0).floor()),
+                        set_width_chars: 48
                     }
                 }
                 _ => {
@@ -84,6 +86,7 @@ impl SimpleComponent for Model {
             timer: None,
             reaction_display: ReactionTimeDisplay::Start,
             time: 0.0,
+            waiting_task: None,
         };
         let widgets = view_output!();
 
@@ -97,11 +100,14 @@ impl SimpleComponent for Model {
                     ReactionTimeDisplay::Start => {
                         // started
                         self.reaction_display = ReactionTimeDisplay::Waiting;
-                        tokio::spawn(async move {
+                        self.waiting_task = Some(tokio::spawn(async move {
                             wait_for_stop(sender).await;
-                        });
+                        }));
                     }
                     ReactionTimeDisplay::Waiting => {
+                        if let Some(waiting_task) = &self.waiting_task {
+                            waiting_task.abort();
+                        }
                         // clicked during waiting, too early
                         self.reaction_display = ReactionTimeDisplay::Fail;
                     }
