@@ -150,7 +150,7 @@ async fn wait_for_stop(sender: ComponentSender<Model>) {
 }
 
 fn main() {
-    let app = RelmApp::new("com.github.nate10j.BetterReactionTime");
+    let app = RelmApp::new("com.github.nate10j.ReactionTimeTest");
     let _ = relm4::set_global_css_from_file(std::path::Path::new("src/styles.css"));
     app.run::<Model>(());
 }
